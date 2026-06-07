@@ -1,0 +1,26 @@
+name: render-report
+
+on:
+  push:
+    paths:
+      - 'render/latest/**'   # fires when Zapier commits new HTML
+
+permissions:
+  contents: write            # lets the job push the rendered PNGs back
+
+concurrency:
+  group: render-report
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: node render.js
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
