@@ -1,0 +1,29 @@
+name: render-report-weekly
+
+on:
+  push:
+    paths:
+      - 'render/latest-weekly/**'   # fires when the WEEKLY Zap commits new HTML
+
+permissions:
+  contents: write
+
+concurrency:
+  group: render-report-weekly
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: node render.js
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          RENDER_SRC: render/latest-weekly
+          RENDER_OUT: render/out-weekly
