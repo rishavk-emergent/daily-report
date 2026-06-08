@@ -1,2 +1,1 @@
-:bar_chart: *DAILY BUSINESS REPORT — direct upload test*
-Native inline images via files_upload_v2.
+:bar_chart: *CUSTOMER SUCCESS REPORT — 07/06 (v2 layout preview)*
