@@ -1,2 +1,2 @@
-:bar_chart: *DAILY BUSINESS REPORT — 07/06*
-Total *745 tickets* closed against *823 opened* yesterday — backlog grew by *78*. Overwatch handled *70%*, with humans absorbing *30%*. *3 of 11 metrics* needs attention — see the watch list below.
+:bar_chart: *DAILY BUSINESS REPORT — direct upload test*
+Native inline images via files_upload_v2.
