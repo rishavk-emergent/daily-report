@@ -1,16 +1,12 @@
-// Renders render/latest/*.html -> render/out/*.png, commits the PNGs back,
-// then posts caption + 4 TITLED images to Slack via Block Kit (bot token).
-// Clean inline images, no raw URL text. Runs inside GitHub Actions.
+// Renders render/latest/*.html -> PNGs and UPLOADS them directly to Slack
+// (files_upload_v2) as native inline images with a caption. No repo/URL needed.
+// Runs inside GitHub Actions.
 
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-const { execSync } = require('child_process');
 const puppeteer = require('puppeteer');
 
-const REPO = process.env.GITHUB_REPOSITORY;                 // "owner/repo"
-const BRANCH = process.env.GITHUB_REF_NAME || 'main';
-const SHA = (process.env.GITHUB_SHA || 'x').slice(0, 8);    // cache-buster for Slack
 const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_CHANNEL = process.env.SLACK_CHANNEL;
 
@@ -23,7 +19,19 @@ const SECTIONS = [
 const LATEST = 'render/latest';
 const OUT = 'render/out';
 
-function slackPost(method, payload) {
+function slackGet(method, qs) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      { hostname: 'slack.com', path: '/api/' + method + '?' + qs, method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + SLACK_TOKEN } },
+      (res) => { let b = ''; res.on('data', d => b += d); res.on('end', () => {
+        let j = {}; try { j = JSON.parse(b); } catch (e) {}
+        j.ok ? resolve(j) : reject(new Error(method + ': ' + (j.error || b))); }); });
+    req.on('error', reject); req.end();
+  });
+}
+
+function slackPostJSON(method, payload) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload);
     const req = https.request(
@@ -33,9 +41,24 @@ function slackPost(method, payload) {
                    'Content-Length': Buffer.byteLength(data) } },
       (res) => { let b = ''; res.on('data', d => b += d); res.on('end', () => {
         let j = {}; try { j = JSON.parse(b); } catch (e) {}
-        j.ok ? resolve(j) : reject(new Error(method + ' failed: ' + (j.error || b))); }); }
-    );
+        j.ok ? resolve(j) : reject(new Error(method + ': ' + (j.error || b))); }); });
     req.on('error', reject); req.write(data); req.end();
+  });
+}
+
+function uploadBytes(uploadUrl, buf, filename) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(uploadUrl);
+    const boundary = '----dr' + Buffer.from(filename).toString('hex').slice(0, 12) + buf.length;
+    const head = Buffer.from('--' + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="' +
+      filename + '"\r\nContent-Type: image/png\r\n\r\n');
+    const tail = Buffer.from('\r\n--' + boundary + '--\r\n');
+    const body = Buffer.concat([head, buf, tail]);
+    const req = https.request(
+      { hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+        headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Content-Length': body.length } },
+      (res) => { let b = ''; res.on('data', d => b += d); res.on('end', () => resolve(b)); });
+    req.on('error', reject); req.write(body); req.end();
   });
 }
 
@@ -45,6 +68,7 @@ function slackPost(method, payload) {
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--font-render-hinting=none'],
   });
+  const ready = [];
   for (const s of SECTIONS) {
     const f = path.join(LATEST, s.key + '.html');
     if (!fs.existsSync(f)) { console.log('skip (missing): ' + f); continue; }
@@ -53,42 +77,30 @@ function slackPost(method, payload) {
     await page.setViewport({ width: 1244, height: 800, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
     await new Promise(r => setTimeout(r, 600));
-    await page.screenshot({ path: path.join(OUT, s.key + '.png'), type: 'png', fullPage: true });
+    const out = path.join(OUT, s.key + '.png');
+    await page.screenshot({ path: out, type: 'png', fullPage: true });
     await page.close();
+    ready.push({ ...s, file: out });
     console.log('rendered ' + s.key);
   }
   await browser.close();
 
-  // Commit PNGs so they have public raw URLs for the image blocks.
-  // render/out/** is not a trigger path -> no loop.
-  execSync('git config user.name "report-bot"');
-  execSync('git config user.email "report-bot@users.noreply.github.com"');
-  execSync('git add ' + OUT);
-  try { execSync('git commit -m "render pngs [skip ci]"', { stdio: 'inherit' }); }
-  catch (e) { console.log('nothing to commit'); }
-  execSync('git push origin HEAD:' + BRANCH, { stdio: 'inherit' });
-
   let caption = ':bar_chart: *DAILY BUSINESS REPORT*';
   try { caption = fs.readFileSync(path.join(LATEST, 'caption.txt'), 'utf8').trim(); } catch (e) {}
 
-  // Build Block Kit: caption section + one titled image block per section.
-  const base = 'https://raw.githubusercontent.com/' + REPO + '/' + BRANCH + '/' + OUT;
-  const blocks = [{ type: 'section', text: { type: 'mrkdwn', text: caption } }];
-  for (const s of SECTIONS) {
-    if (!fs.existsSync(path.join(OUT, s.key + '.png'))) continue;
-    blocks.push({
-      type: 'image',
-      title: { type: 'plain_text', text: s.title, emoji: true },
-      image_url: base + '/' + s.key + '.png?v=' + SHA,
-      alt_text: s.title,
-    });
+  // files_upload_v2: get upload URL -> POST bytes -> complete (all files in one message)
+  const uploaded = [];
+  for (const s of ready) {
+    const buf = fs.readFileSync(s.file);
+    const g = await slackGet('files.getUploadURLExternal', 'filename=' + s.key + '.png&length=' + buf.length);
+    await uploadBytes(g.upload_url, buf, s.key + '.png');
+    uploaded.push({ id: g.file_id, title: s.title });
+    console.log('uploaded ' + s.key);
   }
-  await slackPost('chat.postMessage', {
-    channel: SLACK_CHANNEL,
-    text: caption,          // fallback for notifications
-    blocks: blocks,
-    unfurl_links: false,
-    unfurl_media: false,
+  await slackPostJSON('files.completeUploadExternal', {
+    files: uploaded,
+    channel_id: SLACK_CHANNEL,
+    initial_comment: caption,
   });
-  console.log('posted to slack');
+  console.log('posted to slack (' + uploaded.length + ' images)');
 })().catch(e => { console.error(e); process.exit(1); });
