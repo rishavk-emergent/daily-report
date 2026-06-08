@@ -11,10 +11,9 @@ const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_CHANNEL = process.env.SLACK_CHANNEL;
 
 const SECTIONS = [
-  { key: 'summary', title: '📊 Summary' },
-  { key: 'ow',      title: '🤖 Overwatch Performance' },
-  { key: 'human',   title: '👤 Human Side' },
-  { key: 'tables',  title: '📋 Ticket Status & Escalations' },
+  { key: 'r1', title: '📊 Volume & Automation' },
+  { key: 'r2', title: '⏱️ Resolution TAT (p50/p75/p90)' },
+  { key: 'r3', title: '😊 CSAT & Reopen' },
 ];
 const LATEST = 'render/latest';
 const OUT = 'render/out';
