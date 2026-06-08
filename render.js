@@ -15,8 +15,8 @@ const SECTIONS = [
   { key: 'r2', title: '⏱️ Resolution TAT (p50/p75/p90)' },
   { key: 'r3', title: '😊 CSAT & Reopen' },
 ];
-const LATEST = 'render/latest';
-const OUT = 'render/out';
+const LATEST = process.env.RENDER_SRC || 'render/latest';   // weekly job overrides to render/latest-weekly
+const OUT = process.env.RENDER_OUT || 'render/out';
 
 function slackGet(method, qs) {
   return new Promise((resolve, reject) => {
