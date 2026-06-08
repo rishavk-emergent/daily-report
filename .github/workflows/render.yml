@@ -22,3 +22,6 @@ jobs:
           node-version: '20'
       - run: npm install
       - run: node render.js
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
