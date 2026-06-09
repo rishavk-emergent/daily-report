@@ -1,2 +1,2 @@
 :bar_chart: *CUSTOMER SUCCESS REPORT — 08/06*
-Total *931* tickets closed · Overwatch *69%* / Human *31%* · CSAT *–* · Reopen *14%*
+Total *931* tickets closed · Overwatch *68%* / Human *32%* · CSAT *75%* · Reopen *18%*
