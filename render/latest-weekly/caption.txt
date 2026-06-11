@@ -1,1 +1,2 @@
-:bar_chart: *WEEKLY CUSTOMER SUCCESS REPORT — DAG test preview*
+:bar_chart: *WEEKLY CUSTOMER SUCCESS REPORT — 01/06-07/06*
+Total *6,311* tickets closed · Overwatch *60%* / Human *40%* · CSAT *63%* · Reopen *20%*
